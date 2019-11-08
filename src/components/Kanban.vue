@@ -2,7 +2,7 @@
   <v-container>
     <v-row>
       <v-col cols="4">
-        <v-btn small color="blue" class="white--text"  @click.stop = "dialog = true">What do you want to do?</v-btn>
+        <v-btn small color="blue" class="white--text"  @click.stop = "dialog = true"><span class="text-truncate">Add Todo</span></v-btn>
       </v-col>
       <v-col cols="8">
         <div>
@@ -28,7 +28,7 @@
         <draggable class="draggable-height" :list="todo" group="todo" @change="logTodo">
           <v-card  v-for="(element,index) in todo"
             :key="element.data.name" class="pa-3 mb-2 white--text" color="#616161">
-            {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click="deleteTodo(element.id,index,'todo')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click="displayTodo(index,'todo')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
+            {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click.native="deleteTodo(element.id,index,'todo')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click.native="displayTodo(index,'todo')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
           </v-card>
         </draggable>
       </v-col>
@@ -37,7 +37,7 @@
         <draggable class="draggable-height" :list="progress" group="todo" @change="logProgress">
           <v-card  v-for="(element,index) in progress"
             :key="element.data.name" class="pa-3 mb-2 white--text" color="#42A5F5">
-            {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click="deleteTodo(element.id,index,'progress')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click="displayTodo(index,'progress')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
+            {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click.native="deleteTodo(element.id,index,'progress')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click.native="displayTodo(index,'progress')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
           </v-card>
         </draggable>
       </v-col>
@@ -46,7 +46,7 @@
       <draggable class="draggable-height" :list="done" group="todo" @change="logDone">
         <v-card  v-for="element in done"
           :key="element.data.name" class="pa-3 mb-2 white--text" color="#FFAB40" :disabled="true">
-          {{ element.data.name }}<v-icon style="float:right" color="#1B5E20">mdi-check-circle</v-icon><v-btn style="float:right" text icon color="#FFFF00" @click="displayTodo(index,'done')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
+          {{ element.data.name }}<v-icon style="float:right" color="#1B5E20">mdi-check-circle</v-icon>
         </v-card>
       </draggable>
     </v-col>
@@ -75,6 +75,12 @@
             Add
           </v-btn>
         </v-card-actions>
+        <v-overlay
+          :absolute="true"
+          :value="addOverlay"
+        >
+        <v-progress-circular indeterminate size="32"></v-progress-circular>
+        </v-overlay>
       </v-card>
       </v-dialog>
     <div class="text-center">
@@ -115,15 +121,13 @@
             <p>Name: {{progress.name}}</p>
             <p>Start Date: {{progress.startDate}}</p>
           </div>
-          <div v-if="doneDetails" v-for="(done,index) in doneDetails" :key="index">
-            <p>Status: {{done.status}}</p>
-            <p>Name: {{done.name}}</p>
-            <p>Start Date: {{done.startDate}}</p>
-            <p>End Date: {{done.endDate}}</p>
-          </div>
         </v-card-text>
       </v-card>
   </v-dialog>
+  <!-- OVERLAY -->
+  <v-overlay :value="overlay">
+      <v-progress-circular indeterminate size="64"></v-progress-circular>
+  </v-overlay>
   </v-container>
 </template>
 
@@ -146,8 +150,9 @@ export default {
     dataWithDone: [],
     todoDetails: [],
     progressDetails: [],
-    doneDetails: [],
-    dialogs: false
+    dialogs: false,
+    overlay: true,
+    addOverlay: false
   }),
   created() {
     this.read()
@@ -178,6 +183,7 @@ export default {
   },
   methods: {
     submit() {
+      this.addOverlay = true
       this.$db.collection("kanban").add({
         name: this.name,
         user: this.store.state.user.id,
@@ -187,11 +193,13 @@ export default {
       }).then((res)=>{
         this.dialog = false
         this.name = ''
+        this.addOverlay = false
       })
     },
     read() {
       this.$db.collection("kanban").onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
+          this.overlay = false
           if(change.type == 'added') {
             if(change.doc.data().user == this.store.state.user.id) {
               if(change.doc.data().status == 'todo') {
@@ -313,26 +321,16 @@ export default {
     deleteTodo(id,index,status) {
       this.$db.collection("kanban").doc(id).delete()
         .then(()=>{
-          if(status == 'todo') {
-            this.todo.splice(index,1)
-            this.deleted = true
-          }else if(status == 'progress'){
-            this.progress.splice(index,1)
-            this.deleted = true
-          }
         })
     },
     displayTodo(index, status) {
       this.dialogs = true
       this.todoDetails = []
       this.progressDetails = []
-      this.doneDetails = []
       if(status == 'todo') {
         this.todoDetails.push(this.todo[index].data)
       }else if(status == 'progress') {
         this.progressDetails.push(this.progress[index].data)
-      }else if(status == 'done') {
-        this.doneDetails.push(this.done[index].data)
       }
     },
     todoDone(status) {
