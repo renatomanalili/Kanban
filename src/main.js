@@ -3,10 +3,12 @@ import App from './App.vue'
 import vuetify from './plugins/vuetify'
 import axios from 'axios'
 import * as firebase from 'firebase'
-
+import router from './router'
+import store from './store'
 Vue.config.productionTip = false
 Vue.prototype.$axios = axios
 Vue.prototype.$axios.defaults.headers.common['Access-Control-Allow-Origin'] = '*';
+
 const config = {
   apiKey: process.env.VUE_APP_FIREBASE_API_KEY,
   authDomain: process.env.VUE_APP_FIREBASE_AUTH_DOMAIN,
@@ -18,7 +20,35 @@ const config = {
 const fb = firebase.initializeApp(config)
 Vue.prototype.$fb = fb;
 Vue.prototype.$db = firebase.firestore()
-new Vue({
-  vuetify,
-  render: h => h(App)
-}).$mount('#app')
+Vue.prototype.firebase = firebase
+Vue.prototype.store = store
+
+router.beforeEach((to, from, next) => {
+  const currentUser = firebase.auth().currentUser;
+  const requiresAuth = to.matched.some(recored => recored.meta.requiresAuth)
+  if(requiresAuth && !currentUser) next('login');
+  else if (!requiresAuth && currentUser) next('home');
+  else next();
+})
+let app
+firebase.auth().onAuthStateChanged(user => {
+  if(!app) {
+    app = new Vue({
+      vuetify,
+      router,
+      store,
+      render: h => h(App)
+    }).$mount('#app')
+  }
+  if(user) {
+    store.commit('addUser',{
+      id: user.uid,
+      name: user.displayName,
+      photo: user.photoURL,
+      email: user.email
+    })
+  } else {
+    store.commit('addUser',[])
+  }
+})
+
