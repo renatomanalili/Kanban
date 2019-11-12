@@ -4,7 +4,7 @@
       <v-col cols="4">
         <v-btn small color="blue" class="white--text"  @click.stop = "dialog = true"><span class="text-truncate">Add Todo</span></v-btn>
       </v-col>
-      <v-col cols="8">
+      <v-col sm="8" cols="12">
         <div>
           Total Task: {{ totalTasks }} | Completed task: {{ completedTasks }}
                   <v-progress-circular
@@ -23,29 +23,29 @@
       Successfully Deleted
     </v-alert>
     <v-row>
-      <v-col cols="4">
+      <v-col sm="4" cols="12" style="height: 250px;">
         To Do
         <draggable class="draggable-height" :list="todo" group="todo" @change="logTodo">
           <v-card  v-for="(element,index) in todo"
-            :key="element.data.name" class="pa-3 mb-2 white--text" color="#616161">
+            :key="index" class="pa-3 mb-2 white--text" color="#616161">
             {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click.native="deleteTodo(element.id,index,'todo')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click.native="displayTodo(index,'todo')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
           </v-card>
         </draggable>
       </v-col>
-      <v-col cols="4">
+      <v-col sm="4" cols="12">
         In Progress
         <draggable class="draggable-height" :list="progress" group="todo" @change="logProgress">
           <v-card  v-for="(element,index) in progress"
-            :key="element.data.name" class="pa-3 mb-2 white--text" color="#42A5F5">
+            :key="index" class="pa-3 mb-2 white--text" color="#42A5F5">
             {{ element.data.name }}<v-btn style="float:right" text icon color="#D50000" @click.native="deleteTodo(element.id,index,'progress')"><v-icon class="mb-3">mdi-delete</v-icon></v-btn><v-btn style="float:right" text icon color="#FFFF00" @click.native="displayTodo(index,'progress')"><v-icon class="mb-3">mdi-eye-outline</v-icon></v-btn>
           </v-card>
         </draggable>
       </v-col>
-    <v-col cols="4">
+    <v-col sm="4" cols="12">
        Done
       <draggable class="draggable-height" :list="done" group="todo" @change="logDone">
-        <v-card  v-for="element in done"
-          :key="element.data.name" class="pa-3 mb-2 white--text" color="#FFAB40" :disabled="true">
+        <v-card  v-for="(element,index) in done"
+          :key="index" class="pa-3 mb-2 white--text" color="#FFAB40" :disabled="true">
           {{ element.data.name }}<v-icon style="float:right" color="#1B5E20">mdi-check-circle</v-icon>
         </v-card>
       </draggable>
@@ -182,7 +182,7 @@ export default {
     }
   },
   methods: {
-    submit() {
+    submit(e) {
       this.addOverlay = true
       this.$db.collection("kanban").add({
         name: this.name,
@@ -196,8 +196,8 @@ export default {
         this.addOverlay = false
       })
     },
-    read() {
-      this.$db.collection("kanban").onSnapshot(snapshot => {
+    async read() {
+      await this.$db.collection("kanban").onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
           this.overlay = false
           if(change.type == 'added') {
@@ -222,50 +222,55 @@ export default {
           }
           if(change.type == 'modified') {
             const source = change.doc.metadata.hasPendingWrites ? "Local" : "Server"
-            if(change.doc.data().user == this.store.state.user.id) {
-              if(change.doc.data().status == 'todo') {
-                let index = this.todo.findIndex(x=> x.id == change.doc.id)
-              
-                this.todo.splice(index,1,{
-                  data: change.doc.data(),
-                  id: change.doc.id
-                })
-                let progress = this.progress.filter(zz=>{
-                  return zz
-                })
-                
-                  this.progress = []
-                 progress.forEach(cc=>{
-                   this.progress.push({
-                     data: cc.data,
-                     id: cc.id
-                   })
-                 })
-                
-              }else if(change.doc.data().status == 'progress') {
-                let index = this.progress.findIndex(x=> x.id == change.doc.id)
-                this.progress.splice(index,1,{
-                  data: change.doc.data(),
-                  id: change.doc.id
-                })
-                let todo = this.todo.filter(zz=>{
-                  return zz
-                })
-      
-                  this.todo = []
-                 todo.forEach(cc=>{
-                   this.todo.push({
-                     data: cc.data,
-                     id: cc.id
-                   })
-                 })
-              
-              }else if(change.doc.data().status == 'done') {
-                let index = this.progress.findIndex(x=> x.id == change.doc.id)
-                this.done.splice(index,1,{
-                  data: change.doc.data(),
-                  id: change.doc.id
-                })
+            if(source == "Server") {
+              if(change.doc.data().user == this.store.state.user.id) {
+                if(change.doc.data().status == 'todo') {
+                  let progIndex = this.progress.findIndex(x=> {return x.id == change.doc.id})
+                  this.todo.push({
+                    data: change.doc.data(),
+                    id: change.doc.id
+                  })
+                  this.progress.splice(progIndex,1)
+                }else if(change.doc.data().status == 'progress') {
+                  let todoIndex = this.todo.findIndex(x=> {return x.id == change.doc.id})
+                  this.progress.push({
+                    data: change.doc.data(),
+                    id: change.doc.id
+                  })
+                  this.todo.splice(todoIndex,1)
+                }else if(change.doc.data().status == 'done') {
+                  let progIndex = this.progress.findIndex(x=> x.id == change.doc.id)
+                  let todoIndex = this.todo.findIndex(x=> x.id == change.doc.id)
+                  if(progIndex > -1) {
+                    this.progress.splice(progIndex,1)
+                  }
+                  if(todoIndex > -1) {
+                    this.todo.splice(todoIndex,1)
+                  }
+                  this.done.push({
+                    data: change.doc.data(),
+                    id: change.doc.id
+                  })
+                  
+                }
+              }
+            } else if( source == "Local") {
+              if(change.doc.data().user == this.store.state.user.id) {
+                if(change.doc.data().status == 'todo') {
+                  this.todo.forEach(t=>{
+                    if(t.id == change.doc.id) {
+                      t.data = change.doc.data()
+                    }
+                  })
+                }else if(change.doc.data().status == 'progress') {
+                  this.progress.forEach((p,i)=>{
+                    if(p.id == change.doc.id) {
+                      p.data = change.doc.data()
+                    }
+                  })
+                }else if(change.doc.data().status == 'done') {
+                  
+                }
               }
             }
           } 
@@ -293,6 +298,10 @@ export default {
           } 
         })
       })
+
+      if(this.todo.length == 0 && this.progress.length == 0 && this.done.length == 0) {
+        this.overlay = false
+      }
     },
     logTodo(args) {
       if(args['added']){
@@ -366,6 +375,7 @@ export default {
 </script>
 <style scoped>
   .draggable-height{
-    height: 1000px;
+    max-height: 500px;
+    overflow-y: auto;
   }
 </style>
